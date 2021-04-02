@@ -2,7 +2,7 @@ from selenium.webdriver import Chrome
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from time import sleep
-
+from database import dbBrainly
 
 def get_browser():
     opts = Options()
@@ -44,20 +44,25 @@ def get_subject_links(driver):
         print('load ke {}'.format(i))
         i+=1
 
+    db = dbBrainly()
     xpath_queue = '/html/body/div[5]/div/div[2]/div/div'
-    queue = driver.find_elements_by_xpath(xpath_queue)
+    # queue = driver.find_elements_by_xpath(xpath_queue)
     # print(len(queue))
-    for q in range(len(queue)):
+    for q in range(50):
         driver.find_element_by_xpath(xpath_queue + '/div[{}]'.format(q+1))
         xpath_answer = '/html/body/div[5]/div/div[2]/div/div/div[{}]/div/div/div/div[2]/div[2]/button/a'.format(q+1)
-    #     href = driver.find_element_by_xpath(xpath_answer).get_attribute('href')
-    #     sleep(3)
-    #     print(href)
+        href = driver.find_element_by_xpath(xpath_answer).get_attribute('href')
+        db.insert_url('bindo', href)
+        sleep(3)
+        print('data dimasukkan')
 
 # /html/body/div[5]/div/div[2]/div/div/div[1]/div/div/div/div[2]/div[2]/button/a
 # /html/body/div[5]/div/div[2]/div/div/div[2]/div/div/div/div[2]/div[2]/button/a
+# //*[@id="#qlist"]/div/div[5]
+# //*[@id="#qlist"]/div/div[10]
 
-if __name__ == '__main__':
+
+if __name__ == '__main__':    
     driver = get_browser()
     url = 'https://id.brainly.vip/unanswered'
     driver.get(url)
