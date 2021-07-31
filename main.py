@@ -4,6 +4,7 @@ from selenium.common.exceptions import NoSuchElementException, \
     TimeoutException, ElementNotInteractableException
 from time import sleep
 from database import dbBrainly
+import config
 
 def get_browser():
     opts = Options()
@@ -15,7 +16,7 @@ def get_browser():
 
 def check_pop_up(driver):
     pop_up_elem = '/html/body/div[2]/div/div[3]'
-    driver.implicitly_wait(15)
+    driver.implicitly_wait(10)
     try:
         driver.find_element_by_xpath(pop_up_elem).click()
         print('udah di close')
@@ -28,78 +29,107 @@ def check_pop_up(driver):
         print('tidak ada popup')
         pass
 
+
 def get_info(driver, url):
     driver.get(url)
     sleep(3)
     check_pop_up(driver)
-    # MAPEL
-    subject_elem = "/html/body/div[2]/div/div[2]/div[1]/div[1]/div[1]/article/div/div/div[1]/div/div[2]/ul/li[2]/a"
-    subject_name = driver.find_element_by_xpath(subject_elem).text
-    # Text Pertanyaan
-    text_elem = "/html/body/div[2]/div/div[2]/div[1]/div[1]/div[1]/article/div/div/div[2]/div/div/h1"
-    text = driver.find_element_by_xpath(text_elem).text
-    # Status
-    button_style = 'span.sg-button__text'
-    content = driver.find_element_by_id('question-sg-layout-container')
-    span_text = content.find_element_by_css_selector(button_style).text
 
-    if 'LIHAT JAWABAN' in span_text:
-        status = True
-    else:
-        status = False
+    # Text Pertanyaan
+    try:
+        text_elem = "/html/body/div[2]/div/div[2]/div[1]/div[1]/div[1]/article/div/div/div[2]/div/div/h1"
+        text = driver.find_element_by_xpath(text_elem).text
+    except NoSuchElementException:
+        text = ''
+
+    # penjawab
+    try:
+        penjawab_elem = '//*[@id="question-sg-layout-container"]/div[1]/div[2]/div[2]/div/div[1]/div[2]/div/div[2]/div[1]/span'
+        penjawab = driver.find_element_by_id(penjawab_elem).text
+    except NoSuchElementException:
+        penjawab = ''
+
+    # Status Terjawab
+    try:
+        button_style = 'span.sg-button__text'
+        content = driver.find_element_by_id('question-sg-layout-container')
+        span_text = content.find_element_by_css_selector(button_style).text
+
+        if 'LIHAT JAWABAN' in span_text:
+            terjawab = True
+        else:
+            terjawab = False
+
+    except NoSuchElementException:
+        terjawab = ''
+
+    # Jawaban terverifikasi
+    try: 
+        verif_elem = '//*[@id="question-sg-layout-container"]/div[1]/div[2]/div[2]/div/div[1]/div[1]/div/div[1]/div[2]/h3'
+        verif_content = driver.find_element_by_id(verif_elem).text
+
+        if 'Jawaban terverifikasi ahli' in verif_content:
+            verifikasi = True
+        else:
+            verifikasi = False        
+        
+    except NoSuchElementException:
+        verifikasi = ''
+
 
     data = {
         'url': url,
-        'subjects': subject_name,
         'text_soal': text,
-        'status': status
+        'penjawab': penjawab,
+        'terjawab': terjawab,
+        'terverifikasi': verifikasi
         }
 
     return data
 
 def get_subject_links(driver):
-    driver.implicitly_wait(10)
-    xpath_indo = '/html/body/div[5]/div/div[1]/div[2]/div[2]'
-    driver.find_element_by_xpath(xpath_indo).click()
-
+    driver.implicitly_wait(6)
     xpath_load = '//*[@id="loadMore"]'
     for i in range(10):
         driver.find_element_by_xpath(xpath_load).click()
         sleep(3)
         print('load ke {}'.format(i))
-
-    xpath_queue = '/html/body/div[5]/div/div[2]/div/div'
-    for q in range(50):
-        driver.find_element_by_xpath(xpath_queue + '/div[{}]'.format(q+1))
-        xpath_answer = '/html/body/div[5]/div/div[2]/div/div/div[{}]/div/div/div/div[2]/div[2]/button/a'.format(q+1)
-        href = driver.find_element_by_xpath(xpath_answer).get_attribute('href')
-        db.insert_url('bindo', href)
-        sleep(3)
-        print('data dimasukkan')
+    questions = driver.find_elements_by_xpath('/html/body/div[6]/div/div[2]/div[3]/div')
+    href_list = []
+    i = 1
+    for q in questions:
+        xpath_answer = '//*[@id="questions"]/div[{}]/div/div/div/a'.format(i)
+        href = q.find_element_by_xpath(xpath_answer).get_attribute('href')
+        href_list.append(href)
+        i+=1
+    return href_list
 
 
 if __name__ == '__main__':
-    db = dbBrainly()
+    db = dbBrainly('brainlydb')
     driver = get_browser()
 
-    # # GET URL
-    # url = 'https://id.brainly.vip/unanswered'
-    # driver.get(url)
-    # get_subject_links(driver)
+    kimia = config.MAPEL[1]
+    # GET URL
+    url = 'https://id.brainly.vip/unanswered/{}.html'.format(kimia)
 
-    # GET INFO FROM URL
-    data = db.get_all_urls('bindo')
-    for url in data:
+    driver.get(url)
+    links = get_subject_links(driver)
+    print('scraping for details....')
+
+    for url in links:
         try:
-            u = url['url']
-            collected = get_info(driver, u)
-            db.insert_info('info', collected)
-            print('info inserted')
+            collected = get_info(driver, url)
+            collected['mapel'] = kimia
+            db.insert_info('kimia-detail', collected)
+            print('data {} inserted'.format(kimia))
             sleep(3)
 
-        except NoSuchElementException:
-            print('url error')
+        except NoSuchElementException as no_element:
+            print(no_element)
             pass
+    
+    print('done')
 
     # TEST GET INFO
     # url = ['https://brainly.co.id/tugas/40229022', 'https://brainly.co.id/tugas/40139379']
