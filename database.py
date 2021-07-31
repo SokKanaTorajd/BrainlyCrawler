@@ -1,8 +1,10 @@
 from pymongo import MongoClient
 
-class dbBrainly():
+class dbBrainly(object):
     client = MongoClient()
-    database = 'brainlydb'
+
+    def __init__(self, db_name):
+        self.database = db_name
 
     def insert_url(self, collection, url):
         db  = self.client[self.database]
@@ -10,7 +12,7 @@ class dbBrainly():
 
     def get_all_urls(self, collection):
         db = self.client[self.database]
-        collection = db['bindo']
+        collection = db[collection]
         result = collection.find()
         return result
 
